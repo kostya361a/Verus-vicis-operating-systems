@@ -1,0 +1,33 @@
+import tkinter as tk
+import time
+import math
+
+def update_clock(canvas, size):
+    current_time = time.localtime()
+    hours = current_time.tm_hour
+    minutes = current_time.tm_min
+    seconds = current_time.tm_sec
+
+    angle_seconds = math.radians((seconds / 60.0) * 360.0 - 90)
+    canvas.delete("second")
+    canvas.create_line(size / 2, size / 2, size / 2 + size / 2 * math.cos(angle_seconds), size / 2 + size / 2 * math.sin(angle_seconds), tag="second", fill="red")
+
+    angle_minutes = math.radians((minutes / 60.0) * 360.0 - 90)
+    canvas.delete("minute")
+    canvas.create_line(size / 2, size / 2, size / 2 + size / 2 * 0.8 * math.cos(angle_minutes), size / 2 + size / 2 * 0.8 * math.sin(angle_minutes), tag="minute", fill="black")
+
+    angle_hours = math.radians(((hours % 12) / 12.0 + (minutes / 60.0 / 12.0)) * 360.0 - 90)
+    canvas.delete("hour")
+    canvas.create_line(size / 2, size / 2, size / 2 + size / 2 * 0.6 * math.cos(angle_hours), size / 2 + size / 2 * 0.6 * math.sin(angle_hours), tag="hour", fill="black")
+
+    canvas.after(1000, update_clock, canvas, size)
+
+root = tk.Tk()
+root.title("Analog Clock")
+
+canvas = tk.Canvas(root, width=200, height=200)
+canvas.pack()
+
+update_clock(canvas, 200)
+
+root.mainloop()
