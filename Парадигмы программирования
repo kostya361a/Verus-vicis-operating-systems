@@ -1,20 +1,48 @@
-import ctypes
+#include <ntddk.h>
 
-# Загрузка драйвера (предположим, что у нас есть библиотека с драйвером driver.dll)
-driver = ctypes.CDLL('driver.dll')
+#define DRIVER_TAG 'tad'
 
-# Определение функции из драйвера (например, функции, которая читает данные с устройства)
-read_data = driver.read_data
-read_data.restype = ctypes.c_int  # Указываем тип возвращаемого значения
+UNICODE_STRING g_DeviceName = RTL_CONSTANT_STRING(L"\\Device\\SampleDriver");
+UNICODE_STRING g_SymbolicLinkName = RTL_CONSTANT_STRING(L"\\DosDevices\\SampleDriver");
 
-# Инициализация драйвера (может требоваться для некоторых драйверов)
-driver.init()
+PDEVICE_OBJECT g_DeviceObject = NULL;
 
-# Вызов функции из драйвера для чтения данных
-data = read_data()
+NTSTATUS DriverUnload(PDRIVER_OBJECT driverObject) {
+    UNREFERENCED_PARAMETER(driverObject);
+    IoDeleteSymbolicLink(&g_SymbolicLinkName);
+    if (g_DeviceObject) {
+        IoDeleteDevice(g_DeviceObject);
+    }
+    DbgPrint("Sample driver unloaded\n");
+    return STATUS_SUCCESS;
+}
 
-# Обработка полученных данных
-print(f"Read data from device: {data}")
+NTSTATUS DriverCreateClose(PDEVICE_OBJECT deviceObject, PIRP irp) {
+    UNREFERENCED_PARAMETER(deviceObject);
+    irp->IoStatus.Status = STATUS_SUCCESS;
+    irp->IoStatus.Information = 0;
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+    return STATUS_SUCCESS;
+}
 
-# Освобождение ресурсов и завершение работы с драйвером
-driver.close()
+NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING registryPath) {
+    UNREFERENCED_PARAMETER(registryPath);
+    NTSTATUS status = STATUS_SUCCESS;
+    driverObject->DriverUnload = DriverUnload;
+    driverObject->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
+    driverObject->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
+
+    status = IoCreateDevice(driverObject, 0, &g_DeviceName, FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, FALSE, &g_DeviceObject);
+    if (!NT_SUCCESS(status)) {
+        DbgPrint("Failed to create device object\n");
+        return status;
+    }
+    status = IoCreateSymbolicLink(&g_SymbolicLinkName, &g_DeviceName);
+    if (!NT_SUCCESS(status)) {
+        DbgPrint("Failed to create symbolic link\n");
+        IoDeleteDevice(g_DeviceObject);
+        return status;
+    }
+    DbgPrint("Sample driver loaded\n");
+    return status;
+}
